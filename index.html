@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Survey</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <script defer src="script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+    <div class="theme-toggle" onclick="toggleTheme()">
+        <i class="fas fa-moon" id="theme-icon"></i>
+    </div>
+
+    <div class="background">
+        <img src="background.jpg" alt="City Background">
+    </div>
+
+    <div class="container">
+        <img src="https://img.freepik.com/free-vector/online-survey-tablet_3446-296.jpg?t=st=1741961164~exp=1741964764~hmac=e2107172b25b43f4fa2138c3dfd9b1469e689bdf4a37f899ab2dc47e63341b3e&w=740" class="survey-icon" alt="Survey Icon">
+        <h1 id="title">State Opinion Survey</h1>
+        <p id="loading">Fetching your location...</p>
+        
+        <div id="survey" class="hidden">
+            <p id="question"></p>
+            <input type="text" id="answer" placeholder="Your Answer">
+            <button onclick="submitSurvey()">Submit</button>
+        </div>
+
+        <p id="error" class="error hidden"></p>
+    </div>
+</body>
+</html>
