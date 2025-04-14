@@ -315,7 +315,6 @@ document.addEventListener('DOMContentLoaded', function() {
             )
         ]);
     }
-    }
 
     // Confirm location is correct
     function confirmLocation() {
